@@ -157,12 +157,16 @@ def get_messages_by_category(attribute_scores, category, is_positive=True, limit
 @login_required
 def check_result(request):
     sessions_data = []
-    sessions = Session.objects.distinct()  # 全セッションを取得
-
+    sessions = Session.objects.filter(user=request.user).distinct()
+    
+    # 選択されたセッションIDをクエリパラメータなどから取得する（例: GETパラメータ）
+    selected_session_id = request.GET.get('session_id')
+    
     # 各セッションの偏差値を計算し、結果をまとめる
     for session in sessions:
         try:
-            deviation_values, user_scores = score_to_deviation(session.session_id)
+            # 各セッション毎に偏差値を計算するため、session.session_id を使用する
+            deviation_values, user_scores = score_to_deviation(request.user, session.session_id)
             sessions_data.append({
                 'id': session.session_id,
                 'deviation_value': deviation_values['total']
@@ -171,29 +175,26 @@ def check_result(request):
             logger.warning(f"セッション {session.session_id} のデータ取得失敗: {e}")
             continue
 
-    # 選択されたセッションIDを取得
-    selected_session_id = request.GET.get('session_id')
-
     if selected_session_id:
         try:
             selected_session_id = int(selected_session_id)  # セッションIDを整数に変換
-            selected_session = Session.objects.get(session_id=selected_session_id)
-            deviation_values, user_scores = score_to_deviation(selected_session.session_id)
+            # ログインユーザーのセッションのみ取得するようにする
+            selected_session = Session.objects.get(session_id=selected_session_id, user=request.user)
+            deviation_values, user_scores = score_to_deviation(request.user, selected_session.session_id)
 
-            # レーダーチャートを生成
-            image_buffer = generate_radar_chart(selected_session.session_id)
+            # レーダーチャートを生成（ここも user 情報を渡すように修正する必要があるかもしれません）
+            image_buffer = generate_radar_chart(request.user, selected_session.session_id)
 
             # スコアデータを構築
             score_data = [
                 {
                     'field': field[1],
-                    'score': getattr(user_scores, field[0], 0),  # スコアが存在しない場合に備える
-                    'deviation': deviation_values.get(field[0], 0)  # 偏差値が存在しない場合に備える
+                    'score': getattr(user_scores, field[0], 0),
+                    'deviation': deviation_values.get(field[0], 0)
                 }
                 for field in ATTRIBUTE_CHOICES if field[0] != 'total'
             ]
 
-            # 合計スコアと合計偏差値
             total_score = user_scores.total
             total_deviation_value = deviation_values['total']
 
@@ -224,7 +225,6 @@ def check_result(request):
             logger.error(f"セッションの取得に失敗: {e}")
             return HttpResponse("無効なセッションIDです。", status=400)
 
-    # セッションIDが指定されていない場合のレスポンス
     return render(request, 'SocialInsight/check_result.html', {
         'sessions': sessions_data,
         'session_id': None
@@ -232,10 +232,12 @@ def check_result(request):
 
 
 
+
 @login_required
 def radar_chart_image(request, session_id):
-    image_buffer = generate_radar_chart(int(session_id))
+    image_buffer = generate_radar_chart(request.user, int(session_id))
     return HttpResponse(image_buffer, content_type='image/png')
+
 
 @login_required
 def answer_list_view(request, session_id=None):
@@ -244,7 +246,7 @@ def answer_list_view(request, session_id=None):
         session_id = request.POST.get('session_id')
 
     if session_id:    
-        answer_lists = QandA.objects.filter(session_id = session_id)
+        answer_lists = QandA.objects.filter(session_id=session_id, user=request.user)
     else:
         answer_lists = []
 
@@ -252,7 +254,7 @@ def answer_list_view(request, session_id=None):
 
 @login_required
 def get_bert_scores(request, session_id):
-    qanda_records = QandA.objects.filter(session_id=session_id)
+    qanda_records = QandA.objects.filter(session_id=session_id, user=request.user)
 
     attribute_scores = {}
 
