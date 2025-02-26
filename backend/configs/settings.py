@@ -24,7 +24,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
 
 DEBUG = True #os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1", "app", "socialmind-app-1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "app", "socialmind-app-1","54.250.170.218"]
 
 # Application definition
 
@@ -80,7 +80,7 @@ DATABASES = {
         'NAME': os.environ.get('MYSQL_DATABASE'),
         'USER': os.environ.get('MYSQL_USER'),
         'PASSWORD': os.environ.get('MYSQL_PASSWORD'),
-        'HOST': 'db',
+        'HOST': os.environ.get('MYSQL_HOST'),
         'PORT': '3306',
     }
 }
@@ -126,7 +126,12 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
-
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://redis:6379",
+    }
+}
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
