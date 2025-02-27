@@ -199,15 +199,15 @@ def check_result(request):
             total_score = user_scores.total
             total_deviation_value = deviation_values['total']
 
-            # 強みと改善点の抽出
-            positive_z_scores = [
-                (attribute, z_score) for attribute, z_score in deviation_values.items()
-                if z_score >= 50 and attribute != 'total'
-            ]
-            negative_z_scores = [
-                (attribute, z_score) for attribute, z_score in deviation_values.items()
-                if z_score < 50 and attribute != 'total'
-            ]
+            # 偏差値を昇順にソート（低い順）
+            sorted_scores = sorted(
+                [(attribute, z_score) for attribute, z_score in deviation_values.items() if attribute != 'total'],
+                key=lambda x: x[1]
+            )
+
+            # 上位2つ（強み）＆ 下位2つ（改善点）を選ぶ
+            positive_z_scores = sorted_scores[-2:]  # 上位2つ（リストの最後の2つ）
+            negative_z_scores = sorted_scores[:2]   # 下位2つ（リストの最初の2つ）
 
             strengths = get_messages_by_category(positive_z_scores, 'strength', is_positive=True)
             improvements = get_messages_by_category(negative_z_scores, 'improvement', is_positive=False)

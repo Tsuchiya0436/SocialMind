@@ -44,20 +44,30 @@ def score_to_deviation(user, session_id, is_canceled):
         for field, scores in score_data.items()
     }
 
+    # 偏差値40に相当するスコアを計算
+    default_scores = {
+        field: (score_stats[field]['mean'] - (10 * score_stats[field]['std'])) if score_stats[field]['std'] > 0 else score_stats[field]['mean']
+        for field in score_fields
+    }
+
     # スコアの補正処理（is_canceled が True の場合）
     if is_canceled:
         corrected_scores = {}
 
-        # 忍耐力スコアの補正
-        perseverance_score = getattr(user_scores, 'perseverance', 50)  # ない場合はデフォルト50
-        corrected_scores['perseverance'] = perseverance_score * 0.9
+        # 忍耐力スコアの補正（すでに補正済みかチェック）
+        perseverance_score = getattr(user_scores, 'perseverance', default_scores['perseverance'])
+        if not hasattr(session, 'perseverance_corrected') or not session.perseverance_corrected:
+            corrected_scores['perseverance'] = max(perseverance_score * 0.9, 10)  # 最低スコア10を保証
+            session.perseverance_corrected = True  # 補正済みフラグを追加
+        else:
+            corrected_scores['perseverance'] = perseverance_score
 
         # 回答済みスコアの平均を算出
         answered_scores = [
             getattr(user_scores, field, None) for field in score_fields
             if getattr(user_scores, field, None) is not None and getattr(user_scores, field) > 0
         ]
-        answered_avg = np.mean(answered_scores) if answered_scores else 50
+        answered_avg = np.mean(answered_scores) if answered_scores else default_scores['total']
 
         # 補正係数 α の決定
         if answered_count >= 10:
@@ -65,7 +75,7 @@ def score_to_deviation(user, session_id, is_canceled):
         elif answered_count <= 3:
             alpha = 0.2  # 3問以下なら 0.2
         else:
-            alpha = 0.2 + (answered_count - 3) * (0.6 - 0.2) / (10 - 3)  # 線形補間
+            alpha = 0.2 + (answered_count - 3) * (0.6 - 0.2) / (10 - 3)
 
         # 未回答のスコア補正（忍耐力以外）
         for field in score_fields:
@@ -74,17 +84,22 @@ def score_to_deviation(user, session_id, is_canceled):
 
             existing_score = getattr(user_scores, field, 0)
             if existing_score == 0:  # 未回答の場合のみ補正
-                corrected_scores[field] = 50 * (1 - alpha) + answered_avg * alpha
+                corrected_scores[field] = default_scores[field] * (1 - alpha) + answered_avg * alpha
             else:
                 corrected_scores[field] = existing_score
 
         # 補正後のスコアで user_scores を更新
         for field in score_fields:
             setattr(user_scores, field, corrected_scores[field])
+
+        # 一度補正したら session の is_canceled を False にする
+        session.is_canceled = False
+        session.save()
         user_scores.save()
+
     else:
         # キャンセルされていない場合は元のスコアを使用
-        corrected_scores = {field: getattr(user_scores, field) for field in score_fields}
+        corrected_scores = {field: getattr(user_scores, field, default_scores[field]) for field in score_fields}
 
     # 偏差値計算
     deviation_values = {}
