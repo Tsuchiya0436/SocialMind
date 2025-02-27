@@ -1,0 +1,24 @@
+.score-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+.score-table th, .score-table td {
+    border: 1px solid #ddd;
+    padding: 10px;
+    text-align: center;
+}
+
+.score-table th {
+    background-color: #f4f4f4;
+}
+
+.score-table tbody tr td:first-child {
+    font-weight: bold;
+}
+
+.score-table-container {
+    overflow-x: auto;
+    margin-top: 20px;
+}

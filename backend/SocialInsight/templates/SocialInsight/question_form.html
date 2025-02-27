@@ -21,7 +21,7 @@
     <div class="container mt-4">
         <!-- 進捗バー -->
         <div class="progress mb-4">
-            <div class="progress-bar bg-success" role="progressbar" style="width: {{ answered_count|floatformat:0 }}%;" 
+            <div class="progress-bar bg-success" role="progressbar" style="width: {{ answered_count|default:0|floatformat:0 }}%;" 
                 aria-valuenow="{{ answered_count }}" aria-valuemin="0" aria-valuemax="20">
                 {{ answered_count }}/20
             </div>
